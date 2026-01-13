@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { format, isWithinInterval, subDays, startOfWeek, eachWeekOfInterval } from 'date-fns';
+import { format, subDays, startOfWeek, eachWeekOfInterval } from 'date-fns';
 
 // Custom hook to handle attendance calculations
 export function useAttendanceTracker(selectedDays: Set<string>, today: Date) {
@@ -8,8 +8,14 @@ export function useAttendanceTracker(selectedDays: Set<string>, today: Date) {
     const periodStart = subDays(today, 84);
     const periodEnd = today;
 
-    // Filter selected days to only those within the tracking period
-    const selectedDaysInPeriod = Array.from(selectedDays).map(dayStr => new Date(dayStr)).filter(day => isWithinInterval(day, { start: periodStart, end: periodEnd }));
+    // Get all weeks in the period FIRST
+    const weeksInPeriod = eachWeekOfInterval({ start: periodStart, end: periodEnd }, { weekStartsOn: 1 });
+    const trackedWeekKeys = new Set(weeksInPeriod.map(w => format(w, 'yyyy-MM-dd')));
+
+    // Filter selected days to only those whose WEEK is in the tracking period
+    const selectedDaysInPeriod = Array.from(selectedDays)
+      .map(dayStr => new Date(dayStr))
+      .filter(day => trackedWeekKeys.has(format(startOfWeek(day, { weekStartsOn: 1 }), 'yyyy-MM-dd')));
     const trackedDays = selectedDaysInPeriod.length;
 
     // Count attendance days per week within the period
@@ -18,9 +24,6 @@ export function useAttendanceTracker(selectedDays: Set<string>, today: Date) {
       const weekKey = format(startOfWeek(day, { weekStartsOn: 1 }), 'yyyy-MM-dd'); // Weeks start on Monday
       weekCounts.set(weekKey, (weekCounts.get(weekKey) || 0) + 1);
     }
-
-    // Get all weeks in the period
-    const weeksInPeriod = eachWeekOfInterval({ start: periodStart, end: periodEnd }, { weekStartsOn: 1 });
 
     // Create array of week starts with their attendance counts
     const weekCountsArray = weeksInPeriod.map(weekStart => ({ weekStart, count: weekCounts.get(format(weekStart, 'yyyy-MM-dd')) || 0 }));
